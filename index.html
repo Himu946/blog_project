@@ -143,12 +143,16 @@
     const blogForm = document.getElementById('blogForm');
     const blogList = document.getElementById('blogList');
     const totalBlog = document.getElementById('totalBlog');
+    const submitButton = blogForm.querySelector('button[type="submit"]');
+    // crudcrud.com endpoints expire — replace this with your own endpoint
+    const API_URL = 'https://crudcrud.com/api/5e71f0002df148afa3d2c005363529a1/blogs';
     let blogs = [];
+    let editBlogId = null; // id of the blog being edited, or null when adding
 
     // Fetch blogs from server
     const getBlogs = async () => {
       try {
-        const response = await axios.get('https://crudcrud.com/api/5e71f0002df148afa3d2c005363529a1/blogs');
+        const response = await axios.get(API_URL);
         blogs = response.data;
         updateBlogList();
         updateTotalBlog();
@@ -193,18 +197,21 @@
       const description = document.getElementById('description').value;
 
       try {
-        const response = await axios.post('https://crudcrud.com/api/5e71f0002df148afa3d2c005363529a1/blogs', {
-          imageUrl,
-          title,
-          description
-        });
-
-        blogs.push(response.data);
+        if (editBlogId) {
+          await axios.put(`${API_URL}/${editBlogId}`, { imageUrl, title, description });
+          const blogIndex = blogs.findIndex(blog => blog._id === editBlogId);
+          blogs[blogIndex] = { _id: editBlogId, imageUrl, title, description };
+          editBlogId = null;
+          submitButton.textContent = 'POST BLOG';
+        } else {
+          const response = await axios.post(API_URL, { imageUrl, title, description });
+          blogs.push(response.data);
+        }
         updateBlogList();
         updateTotalBlog();
         blogForm.reset(); // Clear the form
       } catch (error) {
-        console.error("Error posting blog:", error);
+        console.error("Error saving blog:", error);
       }
     });
 
@@ -212,14 +219,15 @@
     blogList.addEventListener('click', async (event) => {
       if (event.target.classList.contains('edit-blog')) {
         const blogId = event.target.dataset.blogId;
-        const blogIndex = blogs.findIndex(blog => blog._id === blogId);
+        const blog = blogs.find(blog => blog._id === blogId);
 
-        // Open a modal or edit form to update the blog (replace this with your implementation)
-        // For example, you might want to pre-fill a form with existing blog data
-        // const blog = blogs[blogIndex];
-        // document.getElementById('imageUrl').value = blog.imageUrl;
-        // document.getElementById('title').value = blog.title;
-        // document.getElementById('description').value = blog.description;
+        // Pre-fill the form; the next submit updates this blog instead of adding one
+        document.getElementById('imageUrl').value = blog.imageUrl;
+        document.getElementById('title').value = blog.title;
+        document.getElementById('description').value = blog.description;
+        editBlogId = blogId;
+        submitButton.textContent = 'UPDATE BLOG';
+        blogForm.scrollIntoView({ behavior: 'smooth' });
       }
     });
 
@@ -230,7 +238,7 @@
 
         if (confirm("Are you sure you want to delete this blog?")) {
           try {
-            await axios.delete(`https://crudcrud.com/api/5e71f0002df148afa3d2c005363529a1/blogs/${blogId}`);
+            await axios.delete(`${API_URL}/${blogId}`);
             blogs = blogs.filter(blog => blog._id !== blogId);
             updateBlogList();
             updateTotalBlog();
